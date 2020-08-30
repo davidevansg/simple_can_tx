@@ -42,22 +42,22 @@ static uint8_t CANThrInit(void);
 static uint8_t AssembleFrame(struct can_frame *fra);
 static uint8_t SendFrame(struct can_frame *fra);
 
-static void PrintCANFrame(struct can_frame *fra);
+static void PrintFrame(struct can_frame *fra);
 static void tick_tx();
 
 /*********** Static Variables ***********/
 static int can_fd;
 
-uint8_t reason_to_quit = 0;
 /*********** Global Variables ***********/
 pthread_t thr_tick;
+uint8_t reason_to_quit = 0;
 
 /************************************************************
- * Function Name Thr_1msTick
+ * Function Name Thr_Tick
  *
- * Purpose: Simple 1ms tick function
+ * Purpose: Simple thread tick function
  *
- * \param[in] void*ptr
+ * \param[in] void *ptr
  *
  * \return
  *      void
@@ -70,7 +70,7 @@ void *Thr_Tick(void *ptr)
     struct itimerspec itval;
 
     itval.it_interval.tv_sec = 0;
-    itval.it_interval.tv_nsec = (100 * (NS_TO_MS));
+    itval.it_interval.tv_nsec = (100 * (NS_TO_MS)); // 100 milliseconds
     itval.it_value.tv_sec = itval.it_interval.tv_sec;
     itval.it_value.tv_nsec = itval.it_interval.tv_nsec;
     int timer_status = timerfd_settime(timer_fd, 0, &itval, NULL);
@@ -85,7 +85,7 @@ void *Thr_Tick(void *ptr)
             break;
         }
 
-        tick_tx();
+        tick_tx(); // call functionality per ~100ms
     }
 
     printf("out of loop\n");
@@ -98,7 +98,7 @@ void *Thr_Tick(void *ptr)
  * Function Name tick_tx
  *
  * Purpose: Calls the respective functionality every
- *          'tick' (100ms in this application).
+ *          'tick' (defined in Thr_Tick).
  *
  * \param[in] void
  *
@@ -120,7 +120,7 @@ static void tick_tx()
     {
         return;
     }
-    PrintCANFrame(&frame);
+    PrintFrame(&frame);
 }
 
 
@@ -141,14 +141,23 @@ static void tick_tx()
  */
 static uint8_t AssembleFrame(struct can_frame *fra)
 {
-    static uint8_t sequence = 0;
+    static uint8_t seq_ctr = 0; // sequence counter
 
     if(fra != NULL)
     {
         (*fra).can_id = 0x100;
         (*fra).can_dlc = 0x08;
+
         memset(&(*fra).data[0], 0x00, (*fra).can_dlc);
-        (*fra).data[0] = sequence++;
+        /* Pretty much the same as this... */
+        /*
+            for(int i = 0; i < (*fra).can_dlc; i++)
+            {
+                (*fra).data[i] = 0x00;
+            }
+        */
+
+        (*fra).data[0] = seq_ctr++;
         return SUCCESS;
     }
     else
@@ -194,7 +203,7 @@ static uint8_t SendFrame(struct can_frame *fra)
 }
 
 /************************************************************
- * Function Name PrintCANFrame
+ * Function Name PrintFrame
  *
  * Purpose: Prints the contents of a given CAN frame.
  *
@@ -205,7 +214,7 @@ static uint8_t SendFrame(struct can_frame *fra)
  *
  ***********************************************************
  */
-static void PrintCANFrame(struct can_frame *fra)
+static void PrintFrame(struct can_frame *fra)
 {
     if(fra != NULL)
     {
